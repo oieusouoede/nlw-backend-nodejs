@@ -1,0 +1,340 @@
+Backend com node
+
+1. Instalando dependências
+
+	yarn add express
+
+	yarn add -D @types/express typescript ts-node-dev
+
+2. Criar src e app.tsc
+
+3. Criar configurações do typescript
+
+	yarn tsc --init
+
+4. Configurar tsconfig.json
+
+	Setar o strict como false
+	
+	Target como "es2017"
+	
+5. Criar o app
+
+6. Criar um script no package.json pra rodar a aplicação
+
+	"scripts": {
+		"dev": "ts-node-dev /src/app.ts"
+	}
+	
+7. Rodar a aplicação com yarn dev
+
+8. Instalar o prisma como dependencia de desenvolvimento
+
+	yarn add prisma -D
+	
+	yarn prisma init
+	
+9. Remover a url do .env e configurar o schema.prisma pra rodar com o sqlite
+
+10. Configurar o GitHub OAuth
+
+Em github.com/settings/applications/ 
+
+Client ID
+0a5232bfcf09124724bc
+
+Clent Secret
+8fc9ebee5c4baf8982926a2786cee2a6fef5ded8
+
+11. Criar rota de login
+
+	yarn add dotenv (pra usar as variaveis de ambiente)
+
+	app.get...
+
+12. Criar rota de callback. Vai ser por onde o backend vai pegar o token gerado pelo github
+
+13. Implementar autenticação do usuário usando o token gerado pelo github
+
+	Criar camadas service e controller
+	
+	instalar o axios
+	
+	yarn add axios
+	
+	e a biblioteca de tipagem do axios
+	
+	yarn add @types/axios -D
+	
+14. Criar um routes.ts pra colocar as rotas
+
+	Configurar a rota do /authenticate
+	
+	Importar o router e
+	
+	colocar app.use(router) no app.ts
+	
+15. Configurar o insomnia pra fazer as requisições
+
+	Criar um projeto e create > request collection
+	
+	Configurar baseURL
+	
+	Criar uma requisição post pasando um json com o code:
+	
+	{
+		"code": "7fda31d81fece4b246ee"
+	}
+	
+	OBS. Vai precisar colocar um app.use(express.json()); no app.ts
+	pra especificar que ele vai receber requisições com um json
+
+	Esse code é o que o github retorna quando a gente chama na /github
+	
+	Se der bad verification code é que pq expirou, só visitar /github de 		novo pra gerar outro
+	
+16. Gerar um token dentro da aplicação a a partir do token que o github forneceu
+
+	Instalar o json web token
+
+	yarn add jsonwebtoken
+	
+	Instalar as tipagens
+	
+	Na service, criar um:
+	
+	interface IAccessTokenResponse {
+ 	   acess_token: String
+	}
+	
+	Isso vai servir pra especificar pro axios o que a gente quer receber de 		volta:
+	
+	const response = await axios.post<IAccessTokenResponse>(url...
+	
+17. Recuperar infos do usuário no github
+
+	const response = await axios.get("https://api.github.com/user" ...
+	
+	Pode ser que precise chamar /github pra gerar outro código
+
+18. Filtrar as informações que serão usadas
+
+	Criar uma interface IUserResponse pra separar as informações que vão ser
+	usadas na aplicação
+	
+19. Fazer integração com o prisma (DB)
+
+	Verificar se ele existe ou não
+	
+	Se existir: gera um token
+	
+	Se não: Criar no DB, gerar um token e retornar o token com os dados
+	
+	Instalar as extensões do prisma (se não tiver)
+	
+	Configurar o prisma como default formatter no vscode
+	
+	"[prisma]": {
+        "editor.defaultFormatter": "Prisma.prisma"
+    	}
+		
+	Criar a model da tabela do usuário no schema.prisma
+	
+	model User {
+  	id            String @id @default(uuid())
+  	name          String 
+  	github_id     Int
+  	avatar_url    String
+  	login         String
+
+  	@@map("users")
+	}
+	
+	Depois:
+	
+	yarn prisma migrate dev
+	
+	Vai pedir pra criar um nome pra migration, pode ser create-user
+
+	Não esquecer de usar a IUserInterface no método get que busca os dados
+	
+	const response = await axios.get<IUserResponse>("https...
+	
+	Desestruturar a response:
+	
+	const { login, id, avatar_url, name } = response.data
+
+	Fazer a checagem e adicionar no banco de dados se preciso, usando o
+	prisma
+
+	let user = await prismaClient.user.findFirst({
+            where: {
+                github_id: id
+            }
+        })
+
+        if(!user) {
+            await prismaClient.user.create({
+                data: {
+                    github_id: id,
+                    login,
+                    avatar_url,
+                    name
+                }
+            })
+        }
+
+	Se eu quiser deixar algum campo do banco como nullable é só ir no
+	schema.prisma e colocar um ? na frente do tipo de dado. Tipo:
+	
+	name          String?
+	
+	Gerar o token com o jasonwebtoken
+	
+	Importar sign do jsonwebtoken.
+	
+	criar um const token = sign(
+	
+	aqui ele recebe 3 parametros: um payload com as informações que o 		usuário autenticado terá acesso, um secret e um subject com o id e 
+	a duração que o token tem pra expirar
+	
+
+	esse secret pode ser um numero aleatório ou um hash gerado a partir de 	qqr coisa
+	
+	
+	Depois finalmente:
+	
+	return {token, user};
+
+20. Implementar o cadastro de mensagens
+
+	Criar a CreateMessageService
+	
+	Criar a tabela no prisma
+	
+	Criar a CreateMessageController
+	
+21. Criar middleware pra ver se o usuário está autenticado
+
+	middleware / ensureAuthenticated.ts
+	
+	Foi preciso sobrescrever a tipagem do typescript:
+	
+	criar
+	
+	@types/express/index.d.ts
+	
+	e colocar a especificação
+	
+	declare namespace Express {
+  		export interface Request {
+    		user_id: string;
+  		}
+	}
+	
+	Colocar no tsconfig.json que é pra ele procurar os tipos
+	em 
+	
+	"typeRoots": ["./src/@types", "node_modules/@types"]
+
+22. Criar uma rota com pra criação de mensagem usando o middleware
+
+23. Configurar o websocket
+
+	websocket =/ http
+	
+	Instalar o socket.io e as tipagens:
+	
+	yarn add socket.io
+	
+	yarn add @types/socket.io -D
+	
+	Importar o http e setar ele pra subir o servidor junto com o app
+	
+	const serverHttp = http.createServer(app);
+	
+	Depois criar o Server do socket.io passando o serverHttp
+	
+	Agora o serverHttp que via ouvir na porta 4000
+	
+	serverHttp.listen(4000, () => console.log(`Up and running on PORT 4000`));
+	
+	Alterar o script no package.json pra:
+	
+	  "scripts": {
+    		"dev": "ts-node-dev --exit-child src/server.ts"
+  		},
+	
+	const io = new Server(serverHttp);
+	
+	Adicionar as dependencias cors
+	
+	yarn add cors
+	
+	yarn add @types/cors -D
+	
+	Configurar o app pra usar o cors
+	
+	Criar uma dummy page html pra testar se o websocket tá funcionando
+
+	Criar /public/index.html
+	
+	colocar:
+	
+	<script
+ 	     src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.min.js"
+      integrity="sha512-eVL5Lb9al9FzgR63gDs1MxcDS2wFu3loYAgjIH0+Hg38tCS8Ag62dwKyH+wzDb+QauDpEZjXbMn11blw8cbTJQ=="
+      crossorigin="anonymous"
+    ></script>
+    
+    e depois colocar 
+    
+    <script>
+    	const socket = io("http://localhost:4000")
+    </script>
+
+24. Passar o server pra um arquivo server.ts
+
+25. Criar evento pra quando uma msg for criada enviar ela pros usuários que estão conectados
+
+	Em CreateMessageService:
+	
+	importar o io e com ele criar um emit pra emitir essa nova msg
+	
+26. Criar uma rota pra exibir as 3 ultimas msgs
+
+27. Criar a rota pra retornar as informações do usuário		
+	
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
